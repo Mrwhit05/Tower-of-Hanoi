@@ -1,4 +1,5 @@
 #include <iostream>
+#include <emscripten.h>
 #include <optional>
 #include <SFML/Graphics.hpp>
 #include "GameLogic.h"
