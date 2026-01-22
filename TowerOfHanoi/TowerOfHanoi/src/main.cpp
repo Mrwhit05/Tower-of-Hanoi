@@ -1,11 +1,15 @@
 #include <iostream>
+
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#endif
+
 #include <optional>
-#include <SFML/Graphics.hpp>
+//#include <SFML/Graphics.hpp>
 #include "GameLogic.h"
 
 using namespace std;
-
+/*
 int getPillarFromMouse(float mouseX, float windowWidth) {
 	float section = windowWidth / 3;
 	return static_cast<int>(mouseX / section);
@@ -225,4 +229,69 @@ int main() {
 		
 		window.display();
 	}
+}*/
+
+GameLogic game(3);
+
+extern "C" {
+	#ifdef EMSCRIPTEN
+	EMSCRIPTEN_KEEPALIVE
+	#endif
+	void onResize(int width, int height) {
+		//setViewport(width, height);
+	}
+
+	#ifdef EMSCRIPTEN
+	EMSCRIPTEN_KEEPALIVE
+	#endif
+	void resetGame() {
+		game.reset();
+	}
+
+	#ifdef EMSCRIPTEN
+	EMSCRIPTEN_KEEPALIVE
+	#endif
+		void selectPillar(int pillar) {
+		game.selectDisk(pillar);
+	}
+
+	#ifdef EMSCRIPTEN
+	EMSCRIPTEN_KEEPALIVE
+	#endif
+		void placePillar(int pillar) {
+		game.placeDisk(pillar);
+	}
+
+	#ifdef EMSCRIPTEN
+	EMSCRIPTEN_KEEPALIVE
+	#endif
+		void selectDisk(int pillar) {
+		game.selectDisk(pillar);
+	}
+
+	#ifdef EMSCRIPTEN
+	EMSCRIPTEN_KEEPALIVE
+	#endif
+		void placeDisk(int pillar) {
+		game.placeDisk(pillar);
+	}
+
+	#ifdef EMSCRIPTEN
+	EMSCRIPTEN_KEEPALIVE
+	#endif
+		int getMoveCount() {
+		return game.getMoveCount();
+	}
+
+	#ifdef EMSCRIPTEN
+	EMSCRIPTEN_KEEPALIVE
+	#endif
+		int isSolved() {
+		return game.isSolved();
+	}
+
+}
+
+int main() {
+	return 0;
 }
