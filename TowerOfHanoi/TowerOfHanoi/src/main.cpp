@@ -1,24 +1,31 @@
 #include <iostream>
+#include <algorithm>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
 
 #include <optional>
-//#include <SFML/Graphics.hpp>
+#include <SDL2/SDL.h>
 #include "GameLogic.h"
+#include "Renderer.h"
 
 using namespace std;
-/*
+
+bool isMouseOver(const SDL_Rect& rect) {
+	int mouseX;
+	int mouseY;
+	SDL_GetMouseState(&mouseX, &mouseY);
+
+	return (mouseX >= rect.x &&
+		mouseX <= rect.x + rect.w &&
+		mouseY >= rect.y &&
+		mouseY <= rect.y + rect.h);
+}
+
 int getPillarFromMouse(float mouseX, float windowWidth) {
 	float section = windowWidth / 3;
 	return static_cast<int>(mouseX / section);
-}
-
-bool isMouseOver(const sf::RectangleShape& rect, sf::RenderWindow& window) {
-	auto pixel = sf::Mouse::getPosition(window);
-	sf::Vector2f world = window.mapPixelToCoords(pixel);
-	return rect.getGlobalBounds().contains(world);
 }
 
 enum class Scene {
@@ -27,22 +34,31 @@ enum class Scene {
 	Win
 };
 
-void handleMenuEvents(const sf::Event& event, const sf::RectangleShape& playButton, sf::RenderWindow& window, Scene& scene) {
-	if (const auto* mouse = event.getIf<sf::Event::MouseButtonPressed>()) {
-		if (mouse->button == sf::Mouse::Button::Left) {
-			auto world = window.mapPixelToCoords(sf::Mouse::getPosition(window));
-			if (playButton.getGlobalBounds().contains(world)) {
+
+void handleMenuEvents(const SDL_Event& event, const SDL_Rect& playButton, Scene& scene) {
+	if (event.type == SDL_MOUSEBUTTONDOWN) {
+		if (event.button.button == SDL_BUTTON_LEFT) {
+			int mouseX = event.button.x;
+			int mouseY = event.button.y;
+
+			bool inside =
+				(mouseX >= playButton.x &&
+				mouseX <= playButton.x + playButton.w &&
+				mouseY >= playButton.y &&
+				mouseY <= playButton.y + playButton.h);
+			if (inside) {
 				scene = Scene::Game;
 			}
 		}
 	}
 }
 
-void handleGameEvents(const sf::Event& event, GameLogic& game, Scene& scene, sf::RenderWindow& window) {
-	if (const auto* mouse = event.getIf<sf::Event::MouseButtonPressed>()) {
-		if (mouse->button == sf::Mouse::Button::Left) {
-			float mouseX = static_cast<float>(mouse->position.x);
-			int pillar = clamp(getPillarFromMouse(mouseX, window.getSize().x), 0, 2);
+void handleGameEvents(const SDL_Event& event, GameLogic& game, Scene& scene) {
+	if (event.type == SDL_MOUSEBUTTONDOWN) {
+		if (event.button.button == SDL_BUTTON_LEFT) {
+			int mouseX = event.button.x;
+
+			int pillar = clamp(getPillarFromMouse(mouseX, 800), 0, 2);
 
 			if (!game.hasSelectedDisk()) {
 				game.selectDisk(pillar);
@@ -54,244 +70,75 @@ void handleGameEvents(const sf::Event& event, GameLogic& game, Scene& scene, sf:
 	}
 }
 
-void handleWinEvents(const sf::Event& event, GameLogic& game, Scene& scene) {
-	if (const auto* mouse = event.getIf<sf::Event::MouseButtonPressed>()) {
-		if (mouse->button == sf::Mouse::Button::Left) {
+
+void handleWinEvents(const SDL_Event& event, GameLogic& game, Scene& scene) {
+	if (event.type == SDL_MOUSEBUTTONDOWN) {
+		if (event.button.button == SDL_BUTTON_LEFT) {
 			game.reset();
 			scene = Scene::Menu;
 		}
 	}
 }
 
-void drawMenu(sf::RenderWindow& window, sf::RectangleShape& playButton, sf::Text& playText) {
-	window.draw(playButton);
-	window.draw(playText);
-}
+Renderer* renderer;
+GameLogic* game;
 
-void drawGame(sf::RenderWindow& window, const GameLogic& game, sf::Text& moveText) {
-	//Move count text
-	moveText.setString("Moves: " + std::to_string(game.getMoveCount()));
-	window.draw(moveText);
+Scene currentScene = Scene::Menu;
+SDL_Rect playButton = { 280, 300, 240, 70 };
 
-	const auto& pillars = game.getPillars();
-	float diskHeight = 20;
+void gameLoop() {
+	SDL_Event event;
 
-	//Pillar builder
-	for (int p = 0; p < 3; p++) {
-		for (int i = 0; i < pillars[p].size(); i++) {
-			int disk = pillars[p][i];
-
-			float width = disk * 30;
-			float x = (800.f / 3.f) * p + (800.f / 6.f) - width / 2.f;
-			float y = 450.f - (i + 1) * diskHeight;
-
-			sf::RectangleShape diskShape(sf::Vector2f(width, diskHeight - 2));
-			diskShape.setFillColor(sf::Color(100, 200, 255));
-			diskShape.setPosition({ x, y });
-			window.draw(diskShape);
+	while (SDL_PollEvent(&event)) {
+		if (event.type == SDL_QUIT) {
 		}
-	}
-
-	//Floating block
-	if (game.hasSelectedDisk()) {
-		int disk = game.getSelectedDisk();
-
-		float width = disk * 30.f;
-		float x = sf::Mouse::getPosition(window).x - width / 2.f;
-		float y = 100.f;
-
-		sf::RectangleShape rect(sf::Vector2f(width, diskHeight - 2));
-		rect.setFillColor(sf::Color(255, 200, 100));
-		rect.setPosition({ x, y });
-
-		window.draw(rect);
-	}
-}
-
-void drawWin(sf::RenderWindow& window, GameLogic& game, sf::Text& winTitle, sf::Text& winMoves, sf::Text& winHint) {
-	winMoves.setString("Solved in " + std::to_string(game.getMoveCount()) + " moves");
-
-	sf::FloatRect mb = winMoves.getLocalBounds();
-	winMoves.setOrigin({ mb.size.x / 2.f, mb.size.y / 2.f });
-	winMoves.setPosition({ 400.f, 260.f });
-
-	window.draw(winTitle);
-	window.draw(winMoves);
-	window.draw(winHint);
-}
-
-void updateMenu(sf::RectangleShape& playButton, sf::RenderWindow& window) {
-	if (isMouseOver(playButton, window)) {
-		playButton.setFillColor(sf::Color(160, 60, 60));
-	}
-	else {
-		playButton.setFillColor(sf::Color(120, 40, 40));
-	}
-}
-
-int main() {
-	Scene currentScene = Scene::Menu;
-	sf::RenderWindow window(sf::VideoMode(sf::Vector2u(800, 600)), "Tower of Hanoi");
-	GameLogic game(3);
-
-	//Load font
-	sf::Font font;
-	if (!font.openFromFile("assets/arial.ttf")) {
-		cerr << "Failed to load font\n";
-		return -1;
-	}
-
-	sf::RectangleShape playButton({ 240.f, 70.f });
-	playButton.setPosition({ 300.f, 300.f });
-	playButton.setFillColor(sf::Color(120, 40, 40));
-	playButton.setOutlineThickness(3.f);
-	playButton.setOutlineColor(sf::Color::White);
-	playButton.setPosition({ 280.f, 300.f });
-
-	sf::Text playText(font);
-	playText.setString("PLAY");
-	playText.setCharacterSize(36);
-	playText.setFillColor(sf::Color::White);
-
-	sf::FloatRect textBounds = playText.getLocalBounds();
-	sf::Vector2f buttonPos = playButton.getPosition();
-	sf::Vector2f buttonSize = playButton.getSize();
-
-	playText.setOrigin({textBounds.position.x + textBounds.size.x / 2.f, textBounds.position.y + textBounds.size.y / 2.f});
-
-	playText.setPosition({ buttonPos.x + buttonSize.x / 2.f, buttonPos.y + buttonSize.y / 2.f });
-
-	sf::Text winTitle(font);
-	winTitle.setString("YOU WIN!");
-	winTitle.setCharacterSize(48);
-	winTitle.setFillColor(sf::Color::Green);
-	winTitle.setPosition({ 400.f, 180.f });
-	auto titleBounds = winTitle.getLocalBounds();
-	winTitle.setOrigin({ titleBounds.size.x / 2.f, titleBounds.size.y / 2.f });
-
-	sf::Text winMoves(font);
-	winMoves.setCharacterSize(24);
-	winMoves.setFillColor(sf::Color::White);
-	winMoves.setPosition({ 400.f, 260.f });
-
-	sf::Text winHint(font);
-	winHint.setString("Click anywhere to return to menu");
-	winHint.setCharacterSize(18);
-	winHint.setFillColor(sf::Color(200, 200, 200));
-	winHint.setPosition({ 400.f, 320.f });
-	auto hintBounds = winHint.getLocalBounds();
-	winHint.setOrigin({ hintBounds.size.x / 2.f, hintBounds.size.y / 2.f });
-
-	//Create move text
-	sf::Text moveText(font);
-	moveText.setString("Moves: 0");
-	moveText.setCharacterSize(20);
-	moveText.setFillColor(sf::Color::White);
-	moveText.setPosition({ 10.f, 10.f });
-
-	while (window.isOpen()) {
-		while (optional<sf::Event> event = window.pollEvent()) {
-			if (event->is<sf::Event::Closed>()) {
-				window.close();
-			}
-
-			if (currentScene == Scene::Menu) {
-				handleMenuEvents(*event, playButton, window, currentScene);
-			}
-
-			if (currentScene == Scene::Game) {
-				handleGameEvents(*event, game, currentScene, window);
-			}
-
-			if (currentScene == Scene::Win) {
-				handleWinEvents(*event, game, currentScene);
-			}
-
-			if (currentScene == Scene::Game and game.isSolved()) {
-				currentScene = Scene::Win;
-			}
-		}
-
-		window.clear(sf::Color::Black);
 
 		if (currentScene == Scene::Menu) {
-			updateMenu(playButton, window);
-			drawMenu(window, playButton, playText);
+			handleMenuEvents(event, playButton, currentScene);
 		}
 
-		else if (currentScene == Scene::Game) {
-			drawGame(window, game, moveText);
+		if (currentScene == Scene::Game) {
+			handleGameEvents(event, *game, currentScene);
 		}
 
-		else if (currentScene == Scene::Win) {
-			drawWin(window, game, winTitle, winMoves, winHint);
+		if (currentScene == Scene::Win) {
+			handleWinEvents(event, *game, currentScene);
 		}
-		
-		window.display();
-	}
-}*/
 
-GameLogic game(3);
-
-extern "C" {
-	#ifdef EMSCRIPTEN
-	EMSCRIPTEN_KEEPALIVE
-	#endif
-	void onResize(int width, int height) {
-		//setViewport(width, height);
+		if (currentScene == Scene::Game and game->isSolved()) {
+			currentScene = Scene::Win;
+		}
 	}
 
-	#ifdef EMSCRIPTEN
-	EMSCRIPTEN_KEEPALIVE
-	#endif
-	void resetGame() {
-		game.reset();
+	renderer->clear();
+
+
+	if (currentScene == Scene::Menu) {
+		bool hovered = isMouseOver(playButton);
+		renderer->drawMenu(playButton, hovered);
 	}
 
-	#ifdef EMSCRIPTEN
-	EMSCRIPTEN_KEEPALIVE
-	#endif
-		void selectPillar(int pillar) {
-		game.selectDisk(pillar);
+	else if (currentScene == Scene::Game) {
+		renderer->drawGame(*game);
 	}
 
-	#ifdef EMSCRIPTEN
-	EMSCRIPTEN_KEEPALIVE
-	#endif
-		void placePillar(int pillar) {
-		game.placeDisk(pillar);
+	else if (currentScene == Scene::Win) {
+		renderer->drawWin(*game);
 	}
 
-	#ifdef EMSCRIPTEN
-	EMSCRIPTEN_KEEPALIVE
-	#endif
-		void selectDisk(int pillar) {
-		game.selectDisk(pillar);
-	}
-
-	#ifdef EMSCRIPTEN
-	EMSCRIPTEN_KEEPALIVE
-	#endif
-		void placeDisk(int pillar) {
-		game.placeDisk(pillar);
-	}
-
-	#ifdef EMSCRIPTEN
-	EMSCRIPTEN_KEEPALIVE
-	#endif
-		int getMoveCount() {
-		return game.getMoveCount();
-	}
-
-	#ifdef EMSCRIPTEN
-	EMSCRIPTEN_KEEPALIVE
-	#endif
-		int isSolved() {
-		return game.isSolved();
-	}
-
+	renderer->present();
 }
 
+bool running = true; 
 int main() {
+	renderer = new Renderer(800, 600);
+	game = new GameLogic(3);
+#ifdef __EMSCRIPTEN__
+	emscripten_set_main_loop(gameLoop, 0, true);
+#else
+	while (running) {
+		gameLoop();
+	}
+#endif
 	return 0;
 }
