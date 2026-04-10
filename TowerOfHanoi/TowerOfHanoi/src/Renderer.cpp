@@ -129,11 +129,11 @@ void Renderer::drawMenu(SDL_Rect& playButton, bool hovered) {
 
 	SDL_Color white = { 255, 255, 255, 255 };
 
-	drawText(renderer, font, "Tower of Hanoi", playButton.x + playButton.w / 2 - 20,
+	drawText(renderer, font, "Tower of Hanoi", 325,
 		playButton.y + playButton.h / 2 - 150,
 		white);
 
-	drawText(renderer, font, "PLAY", playButton.x + playButton.w / 2 - 40,
+	drawText(renderer, font, "PLAY", 375,
 		playButton.y + playButton.h / 2 - 10,
 		white);
 }
@@ -143,7 +143,7 @@ void Renderer::drawWin(const GameLogic& game) {
 	SDL_Color green = { 0, 255, 0, 255 };
 
 	//Title
-	drawText(renderer, font, "YOU WIN!", 320, 180, green);
+	drawText(renderer, font, "YOU WIN!", 350, 180, green);
 
 	//Moves text
 	string moves = "Solved in " + to_string(game.getMoveCount()) + " moves";
