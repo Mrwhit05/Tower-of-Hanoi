@@ -118,7 +118,9 @@ void Renderer::drawGame(const GameLogic& game) {
 	}
 }
 
-void Renderer::drawMenu(SDL_Rect& playButton, bool hovered) {
+void Renderer::drawMenu(SDL_Rect& playButton, SDL_Rect& minusButton,
+                        SDL_Rect& plusButton, bool hovered,
+                        int diskCount, int minDisks, int maxDisks) {
 	if (hovered) {
 		SDL_SetRenderDrawColor(renderer, 160, 60, 60, 255);
 	}
@@ -135,6 +137,41 @@ void Renderer::drawMenu(SDL_Rect& playButton, bool hovered) {
 
 	drawText(renderer, font, "PLAY", 375,
 		playButton.y + playButton.h / 2 - 10,
+		white);
+
+	// Minus button
+	if (diskCount == minDisks) {
+		SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+	}
+	else {
+		SDL_SetRenderDrawColor(renderer, 120, 40, 40, 255);
+	}
+	SDL_RenderFillRect(renderer, &minusButton);
+	drawText(renderer, font, "-",
+		minusButton.x + minusButton.w / 2 - 6,
+		minusButton.y + minusButton.h / 2 - 12,
+		white);
+
+	// Disk count
+	std::string diskLabel = "Disks: " + std::to_string(diskCount);
+	int textW, textH;
+	TTF_SizeText(font, diskLabel.c_str(), &textW, &textH);
+	drawText(renderer, font, diskLabel,
+		400 - textW / 2,
+		minusButton.y + minusButton.h / 2 - textH / 2,
+		white);
+
+	// Plus button
+	if (diskCount == maxDisks) {
+		SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+	}
+	else {
+		SDL_SetRenderDrawColor(renderer, 120, 40, 40, 255);
+	}
+	SDL_RenderFillRect(renderer, &plusButton);
+	drawText(renderer, font, "+",
+		plusButton.x + plusButton.w / 2 - 6,
+		plusButton.y + plusButton.h / 2 - 12,
 		white);
 }
 

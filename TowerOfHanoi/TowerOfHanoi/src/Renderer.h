@@ -19,7 +19,9 @@ public:
 	void clear();
 	void present();
 
-	void drawMenu(SDL_Rect& playButton, bool hovered);
+	void drawMenu(SDL_Rect& playButton, SDL_Rect& minusButton,
+                        SDL_Rect& plusButton, bool hovered,
+                        int diskCount, int minDisks, int maxDisks);
 	void drawGame(const GameLogic& game);
 	void drawWin(const GameLogic& game);
 	
