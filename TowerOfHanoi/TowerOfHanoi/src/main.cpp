@@ -12,6 +12,24 @@
 
 using namespace std;
 
+enum class Scene {
+	Menu,
+	Game,
+	Win
+};
+
+int selectedDiskCount = 3;
+const int MIN_DISKS = 3;
+const int MAX_DISKS = 8;
+
+Renderer* renderer;
+GameLogic* game;
+
+Scene currentScene = Scene::Menu;
+SDL_Rect playButton = { 280, 300, 240, 70 };
+SDL_Rect minusButton = { 200, 370, 50, 50 };
+SDL_Rect plusButton  = { 550, 370, 50, 50 };
+
 bool isMouseOver(const SDL_Rect& rect) {
 	int mouseX;
 	int mouseY;
@@ -28,26 +46,31 @@ int getPillarFromMouse(float mouseX, float windowWidth) {
 	return static_cast<int>(mouseX / section);
 }
 
-enum class Scene {
-	Menu,
-	Game,
-	Win
-};
-
-
-void handleMenuEvents(const SDL_Event& event, const SDL_Rect& playButton, Scene& scene) {
+void handleMenuEvents(const SDL_Event& event, const SDL_Rect& playButton,
+                      const SDL_Rect& minusButton, const SDL_Rect& plusButton,
+                      Scene& scene, int& selectedDiskCount) {
 	if (event.type == SDL_MOUSEBUTTONDOWN) {
 		if (event.button.button == SDL_BUTTON_LEFT) {
 			int mouseX = event.button.x;
 			int mouseY = event.button.y;
 
-			bool inside =
-				(mouseX >= playButton.x &&
-				mouseX <= playButton.x + playButton.w &&
-				mouseY >= playButton.y &&
-				mouseY <= playButton.y + playButton.h);
-			if (inside) {
+			auto isInside = [&](const SDL_Rect& rect) {
+				return (mouseX >= rect.x &&
+				mouseX <= rect.x + rect.w &&
+				mouseY >= rect.y &&
+				mouseY <= rect.y + rect.h);
+			};
+
+			if (isInside(playButton)) {
+				delete game;
+				game = new GameLogic(selectedDiskCount);
 				scene = Scene::Game;
+			}
+			else if (isInside(minusButton)) {
+				selectedDiskCount = max(selectedDiskCount - 1, MIN_DISKS);
+			}
+			else if (isInside(plusButton)) {
+				selectedDiskCount = min(selectedDiskCount + 1, MAX_DISKS);
 			}
 		}
 	}
@@ -80,12 +103,6 @@ void handleWinEvents(const SDL_Event& event, GameLogic& game, Scene& scene) {
 	}
 }
 
-Renderer* renderer;
-GameLogic* game;
-
-Scene currentScene = Scene::Menu;
-SDL_Rect playButton = { 280, 300, 240, 70 };
-
 void gameLoop() {
 	SDL_Event event;
 
@@ -94,7 +111,8 @@ void gameLoop() {
 		}
 
 		if (currentScene == Scene::Menu) {
-			handleMenuEvents(event, playButton, currentScene);
+			handleMenuEvents(event, playButton, minusButton, plusButton,
+                             currentScene, selectedDiskCount);
 		}
 
 		if (currentScene == Scene::Game) {
@@ -105,7 +123,7 @@ void gameLoop() {
 			handleWinEvents(event, *game, currentScene);
 		}
 
-		if (currentScene == Scene::Game and game->isSolved()) {
+		if (currentScene == Scene::Game && game->isSolved()) {
 			currentScene = Scene::Win;
 		}
 	}
@@ -115,7 +133,8 @@ void gameLoop() {
 
 	if (currentScene == Scene::Menu) {
 		bool hovered = isMouseOver(playButton);
-		renderer->drawMenu(playButton, hovered);
+		renderer->drawMenu(playButton, minusButton, plusButton,
+                           hovered, selectedDiskCount, MIN_DISKS, MAX_DISKS);
 	}
 
 	else if (currentScene == Scene::Game) {
@@ -129,10 +148,11 @@ void gameLoop() {
 	renderer->present();
 }
 
+
 bool running = true; 
 int main() {
 	renderer = new Renderer(800, 600);
-	game = new GameLogic(3);
+	game = new GameLogic(selectedDiskCount);
 #ifdef __EMSCRIPTEN__
 	emscripten_set_main_loop(gameLoop, 0, true);
 #else
